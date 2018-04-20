@@ -1,0 +1,129 @@
+From 75766887599f95fee80b64019a04784924f39fd1 Mon Sep 17 00:00:00 2001
+From: Sam Nazarko <email@samnazarko.co.uk>
+Date: Fri, 20 Apr 2018 03:19:15 +0100
+Subject: [PATCH] hdmitx: fix rounding and dithering causing HDR flicker on GXL
+
+hdmi_tx: add support for controlling dithering and rounding via
+debug interface
+
+hdhmi_tx: SoC vendor send AVI.BT2020 when HDR is engaged. This
+should be decoupled according to the ITU.BT2020 spec. To allow us
+to follow upstream, add support for setting BT2020 or BT709
+infoframe via sysfs. Needs poking from Kodi.
+
+hdmi_tx_hw: fix banding issue
+
+hdmi_tx_hw: for now, we do not need to go through the whole setup
+for HDR
+
+hdmi_tx_hw: fix dither effect; tidy up prints
+
+hdmi_tx_hw: use pr_info instead
+
+hdmitx_hw: we can mute effects of round as they are confirmed as
+working. Prevents log spam
+
+aml/hdmi_tx_video: colours fix
+---
+ drivers/amlogic/hdmi/hdmi_tx_20/hdmi_tx_video.c |  3 +-
+ drivers/amlogic/hdmi/hdmi_tx_20/hw/hdmi_tx_hw.c | 48 ++++++++++++++++++++-----
+ 2 files changed, 40 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/amlogic/hdmi/hdmi_tx_20/hdmi_tx_video.c b/drivers/amlogic/hdmi/hdmi_tx_20/hdmi_tx_video.c
+index 9381731..dce6981 100644
+--- a/drivers/amlogic/hdmi/hdmi_tx_20/hdmi_tx_video.c
++++ b/drivers/amlogic/hdmi/hdmi_tx_20/hdmi_tx_video.c
+@@ -647,8 +647,7 @@ int hdmitx_set_display(struct hdmitx_dev *hdev, enum hdmi_vic VideoCode)
+ 				break;
+ 			}
+ 			if (param->color == COLORSPACE_RGB444) {
+-				hdev->para->cs = COLORSPACE_RGB444;
+-				hdev->para->cd = COLORDEPTH_24B;
++				hdev->para->cs = hdev->cur_video_param->color;
+ 				pr_info("hdmitx: rx edid only support RGB format\n");
+ 			}
+ 
+diff --git a/drivers/amlogic/hdmi/hdmi_tx_20/hw/hdmi_tx_hw.c b/drivers/amlogic/hdmi/hdmi_tx_20/hw/hdmi_tx_hw.c
+index 476063f..626a38c 100644
+--- a/drivers/amlogic/hdmi/hdmi_tx_20/hw/hdmi_tx_hw.c
++++ b/drivers/amlogic/hdmi/hdmi_tx_20/hw/hdmi_tx_hw.c
+@@ -1974,30 +1974,36 @@ next:
+ 	case COLORDEPTH_48B:
+ 		if (get_cpu_type() >= MESON_CPU_MAJOR_ID_GXM) {
+ 			unsigned int hs_flag = 0;
++                        /* 12-10 dithering on */
++                        hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 1, 4, 1);
+ 			/* hsync/vsync not invert */
+ 			hs_flag = (hd_read_reg(P_VPU_HDMI_SETTING) >> 2) & 0x3;
+ 			hd_set_reg_bits(P_VPU_HDMI_SETTING, 0, 2, 2);
++                        /* 12-10 rounding off */
++                        hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 0, 10, 1);
+ 			/* 10-8 dithering off (2x2 old dither) */
+ 			hd_set_reg_bits(P_VPU_HDMI_DITH_CNTL, 0, 4, 1);
+ 			/* set hsync/vsync */
+ 			hd_set_reg_bits(P_VPU_HDMI_DITH_CNTL, hs_flag, 2, 2);
++                } else {
++                        hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 0, 4, 1);
++                        hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 1, 10, 1);
+ 		}
+-		/* 12-10 dithering off (10-8 <= GXL) */
+-		hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 0, 4, 1);
+-		/* 12-10 rounding off (10-8 <= GXL) */
+-		hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 0, 10, 1);
+ 		break;
+ 	default:
+ 		if (get_cpu_type() >= MESON_CPU_MAJOR_ID_GXM) {
++                        /* 12-10 dithering off */
++                        hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 0, 4, 1);
++                        /* 12-10 rounding on */
++                        hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 1, 10, 1);
+ 			/* 10-8 dithering on (2x2 old dither) */
+ 			hd_set_reg_bits(P_VPU_HDMI_DITH_CNTL, 1, 4, 1);
+ 			/* set hsync/vsync as default 0 */
+ 			hd_set_reg_bits(P_VPU_HDMI_DITH_CNTL, 0, 2, 2);
+-		}
+-		/* 10-8 dithering on (10-8 <= GXL) */
+-		hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 1, 4, 1);
+-		/* 12-10 rounding on (10-8 <= GXL) */
+-		hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 1, 10, 1);
++		} else {
++                       hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 0, 4, 1);
++                       hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, 1, 10, 1);
++                }
+ 		break;
+ 	}
+ 
+@@ -3013,6 +3019,30 @@ static void hdmitx_debug(struct hdmitx_dev *hdev, const char *buf)
+ 			hdmi_print(INF, HPD "hdmitx: unlock hpd\n");
+ 		}
+ 		return;
++	} else if (strncmp(tmpbuf, "dither", 6) == 0) {
++		int dither = 0;
++		if (tmpbuf[7] == '1')
++			dither = 1;
++		hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, dither, 4, 1);
++		pr_info("hdmitx: adjust dither = %d\n", dither);
++		return;
++        } else if (strncmp(tmpbuf, "round", 5) == 0) {
++                int round = 0;
++                if (tmpbuf[6] == '1')
++                        round = 1;
++		hd_set_reg_bits(P_VPU_HDMI_FMT_CTRL, round, 10, 1);
++//                pr_info("hdmitx: adjust round = %d\n", round);
++		return;
++	} else if (strncmp(tmpbuf, "do2020", 6) == 0) {
++		pr_info("hdmitx: BT2020 AVI ON\n");
++		hdmitx_set_reg_bits(HDMITX_DWC_FC_AVICONF1, 3, 6, 2);
++                hdmitx_set_reg_bits(HDMITX_DWC_FC_AVICONF2, 6, 4, 3);
++		return;
++        } else if (strncmp(tmpbuf, "no2020", 6) == 0) {
++		pr_info("hdmitx: BT2020 AVI OFF\n");
++                hdmitx_set_reg_bits(HDMITX_DWC_FC_AVICONF1, 2, 6, 2);
++                hdmitx_set_reg_bits(HDMITX_DWC_FC_AVICONF2, 0, 4, 3);
++		return;
+ 	} else if (strncmp(tmpbuf, "hpd_stick", 9) == 0) {
+ 		if (tmpbuf[9] == '1')
+ 			hdev->hdcp_hpd_stick = 1;
+-- 
+2.7.4
+

@@ -1,0 +1,41 @@
+From d8cec7599629b17a325d0e9a726927fe26a1d2c1 Mon Sep 17 00:00:00 2001
+From: Sam Nazarko <email@samnazarko.co.uk>
+Date: Fri, 20 Apr 2018 03:41:16 +0100
+Subject: [PATCH 1/2] Amlogic: fix banding issues
+
+---
+ xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp | 3 +++
+ xbmc/windowing/amlogic/WinSystemAmlogic.cpp         | 3 +++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
+index 04d351d..f50576b 100644
+--- a/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
++++ b/xbmc/cores/VideoPlayer/DVDCodecs/Video/AMLCodec.cpp
+@@ -1901,6 +1901,9 @@ void CAMLCodec::Reset()
+ 
+ bool CAMLCodec::AddData(uint8_t *pData, size_t iSize, double dts, double pts)
+ {
++  // bandfix
++  SysfsUtils::SetString("/sys/class/amhdmitx/amhdmitx0/debug", "round1");
++
+   if (!m_opened || !pData)
+     return false;
+ 
+diff --git a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+index 120f7b3..eeb938a 100644
+--- a/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
++++ b/xbmc/windowing/amlogic/WinSystemAmlogic.cpp
+@@ -75,6 +75,9 @@ CWinSystemAmlogic::CWinSystemAmlogic()
+   aml_permissions();
+   aml_disable_freeScale();
+ 
++  // bandfix
++  SysfsUtils::SetString("/sys/class/amhdmitx/amhdmitx0/debug", "round1");
++
+   m_winEvents.reset(new CWinEventsLinux());
+   // Register sink
+   AE::CAESinkFactory::ClearSinks();
+-- 
+2.7.4
+
