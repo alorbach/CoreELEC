@@ -34,6 +34,16 @@ PKG_CONFIGURE_OPTS_TARGET="--without-jpeg \
 	--enable-static \
 	--disable-shared"
 
+post_unpack() {
+    sed -i 's/KEY_OK/KEY_ENTER/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+    sed -i 's/KEY_CHANNELUP/KEY_PAGEUP/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+    sed -i 's/KEY_CHANNELDOWN/KEY_PAGEDOWN/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+    sed -i 's/KEY_INFO/KEY_I/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+    sed -i 's/KEY_LANGUAGE/KEY_GRAVE/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+    sed -i 's/KEY_CONTEXT_MENU/KEY_O/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+    sed -i 's/KEY_SUBTITLE/KEY_L/g' $PKG_BUILD/utils/keytable/rc_keymaps/*
+}
+
 pre_configure_target() {
   # cec-ctl fails to build in subdirs
   cd $PKG_BUILD
