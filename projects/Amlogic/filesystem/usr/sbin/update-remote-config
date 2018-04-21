@@ -18,14 +18,12 @@
 #  along with CoreELEC.  If not, see <http://www.gnu.org/licenses/>.
 ################################################################################
 
-if [ ! -e /storage/.cache/coreelec_init ]; then
-  if [ -e /storage/.kodi/userdata/Database/Textures13.db ]; then
-    CACHEDURL=`/usr/bin/sqlite3 /storage/.kodi/userdata/Database/Textures13.db "SELECT cachedurl FROM texture WHERE url = '/usr/share/kodi/addons/service.libreelec.settings/resources/icon.png';"`
-    CACHEDFILE=/storage/.kodi/userdata/Thumbnails/$CACHEDURL
-    if [ -e $CACHEDFILE ]; then
-      rm $CACHEDFILE
-      /usr/bin/sqlite3 /storage/.kodi/userdata/Database/Textures13.db "DELETE FROM texture WHERE url = '/usr/share/kodi/addons/service.libreelec.settings/resources/icon.png';"
-    fi
-  fi
-fi
-touch /storage/.cache/coreelec_init
+for i in /storage/.config/rc_keymaps/*; do
+  sed -i 's/KEY_INFO/KEY_I/g' $i
+  sed -i 's/KEY_CONTEXT_MENU/KEY_O/g' $i
+  sed -i 's/KEY_CHANNELUP/KEY_PAGEUP/g' $i
+  sed -i 's/KEY_CHANNELDOWN/KEY_PAGEDOWN/g' $i
+  sed -i 's/KEY_OK/KEY_ENTER/g' $i
+  sed -i 's/KEY_LANGUAGE/KEY_GRAVE/g' $i
+  sed -i 's/KEY_SUBTITLE/KEY_L/g' $i
+done
